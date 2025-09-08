@@ -1,0 +1,47 @@
+> library(readr)
+> penguins <- read_csv("R_Assignments_Durkin/data/penguins.csv")
+Rows: 344 Columns: 8                                                  
+── Column specification ──────────────────────────────────────────────
+Delimiter: ","
+chr (3): species, island, sex
+dbl (5): bill_length_mm, bill_depth_mm, flipper_length_mm, body_ma...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> View(penguins)
+> summary(penguins$bill_length_mm)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+  32.10   39.23   44.45   43.92   48.50   59.60       2 
+> Summary(penguins$body_mass_g)
+Error: unable to find an inherited method for function ‘Summary’ for signature ‘x = "numeric"’
+
+> summary(penguins$body_mass_g)
+   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+   2700    3550    4050    4202    4750    6300       2 
+> table(penguins$species)
+
+   Adelie Chinstrap    Gentoo 
+      152        68       124 
+> table(penguins$sex)
+
+female   male 
+   165    168 
+> #transform a variable
+> penguins$body_mass_z <- scale(penguins$body_mass_g)
+> head(penguins$body_mass_z)
+           [,1]
+[1,] -0.5633167
+[2,] -0.5009690
+[3,] -1.1867934
+[4,]         NA
+[5,] -0.9374027
+[6,] -0.6880121
+> #plot quantitative var
+> hist(penguins$body_mass_g,
++      main="Histogram of Penguin Body Mass",
++      xlab = "Body Mass (g)")
+> #Scatterplot
+> plot(penguins$bill_length_mm, penguins$flipper_length_mm,
++      xlab = "Bill Length (mm)",
++      ylab = "Flipper Length (mm)",
++      main = "Scatterplot: Bill Length vs Flipper Length")
