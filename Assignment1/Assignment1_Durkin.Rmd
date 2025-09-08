@@ -1,0 +1,47 @@
+---
+title: "Assignment 1 - Penguins Dataset"
+author: "Kristen Durkin"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+## Purpose
+Set up R/RStudio/GitHub and demonstrate basic data analysis steps in R using a dataset.
+
+## Dataset and Source
+We use the Palmer Penguins dataset (with a mix of quantitative + categorical variables).  
+**Source:** https://raw.githubusercontent.com/allisonhorst/palmerpenguins/main/inst/extdata/penguins.csv
+
+## Import dataset
+```{r}
+penguins <- read.csv(
+  "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/main/inst/extdata/penguins.csv"
+)
+
+## Plot Points
+summary(penguins$bill_length_mm) #Quantitative
+summary(penguins$body_mass_g)   #Quantitative
+table(penguins$species)         #Categorical
+table(penguins$sex)             #Categorical
+
+# Transform Var
+penguins$body_mass_z <- scale(penguins$body_mass_g)
+head(penguins$body_mass_z)
+
+# Quantitative Plot
+hist(penguins$body_mass_g,
+     main = "Histogram of Penguin Body Mass",
+     xlab = "Body Mass (g)")
+
+# Scatterplot
+plot(penguins$bill_length_mm, penguins$flipper_length_mm,
+     xlab = "Bill Length (mm)",
+     ylab = "Flipper Length (mm)",
+     main = "Scatterplot: Bill Length vs Flipper Length")
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
