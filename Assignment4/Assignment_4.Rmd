@@ -1,0 +1,176 @@
+---
+title: "Assignment_4"
+author: "Kristen Durkin"
+date: "2025-10-26"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Data
+```{r}
+df <- read.csv("Pharmaceuticals.csv", stringsAsFactors = FALSE)
+head(df)
+```
+
+```{r}
+#select numeric variables (1-9)
+data_num <- df[,1:9]
+# take all the rows but only the first 9 columns from the data set.
+summary (data_num) 
+#check to make sure the data is looking correct
+
+# Keep only numeric columns
+data_numeric_only <- df[, sapply(df, is.numeric)]
+
+# Scale the numeric data
+data_scaled <- scale(data_numeric_only)
+#This standardized the numeric data with a mean of 0 and standard deviation of 1
+
+# Show a few rows of the scaled data
+head(data_scaled)
+```
+
+#choosing number of clusters with Elbow Method 
+#This method helps determine the best number of clusters (k) for K-Means. 
+#It calculates how much total variation exists within clusters (WSS) for different k values.
+# The “elbow” of the plot should show where adding more clusters doesn’t improve much.
+```{r}
+wss <- numeric(10)
+#Within-Cluster Sum of Squares will create an empty numeric vector to store results 
+
+# Loop through cluster numbers 1 to 10.
+# For each k, run K-Means and record the total within-cluster sum of squares.
+for (k in 1:10) {
+  km <- kmeans(data_scaled, centers = k)
+  wss[k] <- km$tot.withinss
+  # This runs the K-Means algorithm using the scaled data and will test how close the clustering is
+}
+
+# Plot the elbow chart
+plot(1:10, wss, type = "b", main = "Elbow Method for Choosing k",
+     xlab = "Number of Clusters (k)",
+     ylab = "Total Within-Cluster Sum of Squares")
+#This draws the elbow chart
+#The chart shows a big drop from 1-4 but after the improvements become smaller indicating diminishing returns
+```
+
+#Run K-Means w/ Chosen k
+
+#Since the elbow plot suggests k = 4, we’ll run the K-Means algorithm.
+```{r}
+set.seed(8)   
+k <- 4
+km_result <- kmeans(data_scaled, centers = k, nstart = 25)
+
+#set.seed(8) Ensures reproducibility
+# 'nstart = 25' runs the algorithm 25 times with different random starting points to make sure the result is stable and reliable.
+
+# Display the main results from the K-Means model.
+km_result
+```
+#K-means clustering with 4 clusters of company sizes (1) 4,(2) 3, (3) 8, (4) 6
+
+#cluster 1 is showing large, efficient and profitable companies. They look to have avg returns but a healthy profit margin
+
+#cluster 2  is showing small-to-mid size companies with an high p/e ratio but looks to show low profitability
+
+#cluster 3 is more moderate with average sized companies. They rare trending with a little below average market risk (lower beta)
+
+#cluster 4 are smaller but leveraged companies. They have higher growth opporunity but lower profit margins.
+
+#SS number = 56.5% meaning the variation is explained by the cluster differences and they are not random.
+
+#Add Cluster Labels to the data
+```{r}
+df$Cluster <- km_result$cluster
+head(df)
+```
+#We need to know which firm belongs to which cluster so we can compare groups.
+
+
+# Cluster Diagnostics
+```{r}
+km_result$centers
+```
+#Sizes tell us if any cluster is too tiny/huge; centers show the "average"
+#      profile of each cluster in STANDARDIZED units (after scale()).
+
+#CLUSTER MEANS - Original Values
+```{r}
+cluster_means_raw <- aggregate(
+  x = df[, sapply(df, is.numeric)],
+  by = list(Cluster = df$Cluster),
+  FUN = mean, na.rm = TRUE
+)
+cluster_means_raw
+```
+#Centers above are in z-scores; business interpretation is easier in the original units (ie, Market_Cap billions, margins %, etc.).
+
+# Cluster Means - Scaled Values
+```{r}
+scaled_df <- as.data.frame(data_scaled)
+scaled_df$Cluster <- df$Cluster
+cluster_means_scaled <- aggregate(
+  x = scaled_df[, !names(scaled_df) %in% "Cluster"],
+  by = list(Cluster = scaled_df$Cluster),
+  FUN = mean
+)
+cluster_means_scaled
+```
+#Z scores show us how far above/below the dataset avg of each cluster sits.
+
+#Cluster Plot 
+```{r}
+plot(
+  data_scaled[, 1], data_scaled[, 2],
+  col = df$Cluster,
+  pch = 16,
+  main = "K-Means Clustering (Simple 2D View)",
+  xlab = colnames(data_scaled)[1],
+  ylab = colnames(data_scaled)[2]
+)
+points(km_result$centers[, 1:2], pch = 8, cex = 1.5)
+legend("topright", legend = sort(unique(df$Cluster)),
+       col = sort(unique(df$Cluster)), pch = 16, title = "Cluster")
+```
+#plot() creates a simple scatterplot.
+
+#data_scaled[, 1] - this is the first numeric variable in the scaled dataset (on the x-axis).
+
+#data_scaled[, 2] - the second numeric variable (on the y-axis).
+
+#col = df$Cluster - colors each point according to which cluster it belongs to (so points in the same cluster share a color).
+
+#pch = 16 - sets the plotting character (a filled circle).
+
+#main - adds a title to the plot.
+
+#xlab / ylab - automatically labels the axes using the dataset’s first two column names.
+
+
+# Quick visual check that clusters are reasonably separated
+
+#Interpreation & Conclusion
+# The cat() function prints text in the export
+
+```{r results='asis'}
+cat("
+
+** The K-Means analysis grouped the pharmaceutical firms into four distinct clusters based on their financial performance metrics. Each cluster represents a unique combination of company size, profitability, leverage, and growth pattern:
+
+** Cluster 1 – High-Performer Large Caps:These companies show strong Market Cap, ROE, and ROA, with high efficiency (Asset Turnover) and healthy profit margins. They operate with lower leverage, indicating stability and consistent profitability.
+
+** Cluster 2 – High-Valuation, Low-Profit Firms: Smaller companies with very high P/E ratios but weak profitability (low ROE, ROA) and negative profit margins. These firms may be valued highly by investors but Are still developing stable earnings.
+
+** Cluster 3 – Stable Mid-Range Performers: Moderate in size, with average profitability and slightly below-average market risk.These companies represent balanced, dependable performers with consistent financials.
+
+** Cluster 4 – Leveraged Growth Firms: Smaller firms with high leverage and strong revenue growth potential but thinner profit margins. They may be pursuing aggressive expansion financed by debt, prioritizing growth over immediate profitability.
+
+** Overall: The four-cluster model explains about 56.5% of the total variation, showing that the segmentation captures meaningful financial differences. This classification  helps identify leaders, stable performers, and high-risk/high-reward firms across the pharmaceutical industry."
+)
+```
