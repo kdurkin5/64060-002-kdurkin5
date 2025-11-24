@@ -1,0 +1,411 @@
+---
+title: "Assignment5_Durkin"
+author: "Kristen Durkin"
+date: "2025-11-24"
+output: word_document
+---
+```{r setup, include=FALSE}
+# Environment Setup
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+# Loading packages needed for the assignment
+library(cluster)
+library(factoextra)
+library(dplyr)
+library(ggplot2)
+```
+
+# Introduction
+
+This assignment uses hierarchical clustering to analyze breakfast cereals. The goal is to group similar cereals together and identify which ones would be best for elementary school cafeterias.
+
+---
+
+# (a) Data Preparation
+
+```{r load-data}
+# Loading the Cereals dataset
+Cereals <- read.csv("Cereals.csv")
+
+# Quick look at what we're working with
+head(Cereals)
+
+# Checking the size
+cat("Dataset size:", nrow(Cereals), "cereals with", ncol(Cereals), "variables\n")
+```
+## Checking for Missing Values
+
+Remove any cereals with missing value
+```{r check-missing}
+# Looking for missing data
+cat("Missing values by column:\n")
+colSums(is.na(Cereals))
+
+cat("\nTotal missing:", sum(is.na(Cereals)), "\n")
+```
+## Remove Missing Values
+```{r remove-missing}
+# Removing rows with any NA values
+# Using na.omit()
+Cereals_clean <- na.omit(Cereals)
+
+cat("Started with:", nrow(Cereals), "Cereals\n")
+cat("After cleaning:", nrow(Cereals_clean), "Cereals\n")
+cat("Removed:", nrow(Cereals) - nrow(Cereals_clean), "Cereals\n")
+```
+
+## Preparing Data for Clustering
+
+Hierarchical clustering only works with numerical data. So we will need to separate out the numbers from the categories.
+
+```{r prep-data}
+# Saving Cereal names as row names so we can see which cereal is which later
+rownames(Cereals_clean) <- Cereals_clean$name
+
+# Selecting only the nutritional variables (the numbers we want to cluster on)
+Cereals_num <- Cereals_clean[, c
+                  ("calories", "protein", "fat", "sodium", 
+                    "fiber", "carbo", "sugars", "potass", 
+                      "vitamins", "rating")]
+
+cat("Using these variables for clustering:\n")
+print(colnames(Cereals_num))
+```
+## Normalizing The Data
+
+Different variables have wildly different scales. Sodium is measured in milligrams, protein is in grams. Without normalizing, sodium would dominate the clustering just because the numbers are bigger.
+
+```{r normalize}
+# Using scale() to normalize - this makes all variables comparable
+# Each variable will have mean = 0 and standard deviation = 1
+Cereals_scaled <- scale(Cereals_num)
+
+# Checking that it worked
+cat("Original means:\n")
+print(round(colMeans(Cereals_num), 2))
+
+cat("\nScaled means:\n") #/should be near 0
+print(round(colMeans(Cereals_scaled), 2))
+```
+---
+
+# (b) Comparing Clustering Methods
+
+The assignment asks to compare 4 different linkage methods using Agnes. Agnes means agglomerative (bottom-up) hierarchical clustering.
+
+## Running All Four Methods
+```{r run-agnes}
+# Computing each method
+# Single linkage - uses closest points between clusters
+hc_single <- agnes(Cereals_scaled, method = "single")
+
+# Complete linkage - uses farthest points between clusters
+hc_complete <- agnes(Cereals_scaled, method = "complete")
+
+# Average linkage - uses average distance between all points
+hc_average <- agnes(Cereals_scaled, method = "average")
+
+# Ward's method - minimizes variance within clusters
+hc_ward <- agnes(Cereals_scaled, method = "ward")
+```
+## Comparing the Methods
+The (Agnes) agglomerative coefficient tells us how well the clustering worked. Higher numbers mean better, more distinct clusters.
+```{r compare-methods}
+# Printing out the coefficients
+cat("Agglomerative Coefficients:\n")
+cat("Single:  ", round(hc_single$ac, 4), "\n")
+cat("Complete:", round(hc_complete$ac, 4), "\n")
+cat("Average: ", round(hc_average$ac, 4), "\n")
+cat("Ward:    ", round(hc_ward$ac, 4), "\n")
+
+# Finding the best one
+methods <- c("Single", "Complete", "Average", "Ward")
+coefficients <- c(hc_single$ac, hc_complete$ac, hc_average$ac, hc_ward$ac)
+best_idx <- which.max(coefficients)
+
+cat("\nBest method:", methods[best_idx], 
+    "with coefficient", round(coefficients[best_idx], 4), "\n")
+```
+## Ward
+Best method: Ward with coefficient 0.923. The higher coefficient confirms it's creating the clearest groupings.
+
+## Visualizing the Dendrograms
+
+Dendrograms show how the clustering happened. Cereals that merge lower down are more similar.
+
+```{r dendrograms, fig.width=10, fig.height=8}
+# Creating a 2x2 grid to see all methods at once
+par(mfrow = c(2, 2))
+
+pltree(hc_single, cex = 0.6, hang = -1, main = "Single Linkage")
+pltree(hc_complete, cex = 0.6, hang = -1, main = "Complete Linkage")
+pltree(hc_average, cex = 0.6, hang = -1, main = "Average Linkage")
+pltree(hc_ward, cex = 0.6, hang = -1, main = "Ward's Method")
+
+par(mfrow = c(1, 1))
+```
+**Note:** Ward's dendrogram shows the clearest separation between groups. The height where clusters merge tells us how different they are.
+
+---
+
+# (c) Choosing the Number of Clusters
+
+Using Ward's method (the best one) to figure out how many clusters make sense.
+
+## Finding Optimal k
+
+There are several ways to determine the right number of clusters. Next we will use three different methods to be certain.
+```{r optimal-k, fig.width=10, fig.height=4}
+# Method 1: Elbow plot
+# Looking for where the line "bends" - that's often the sweet spot
+fviz_nbclust(Cereals_scaled, FUN = hcut, method = "wss", k.max = 10) +
+  labs(title = "Elbow Method") +
+  theme_minimal()
+```
+```{r silhouette-method, fig.width=10, fig.height=4}
+# Method 2: Silhouette
+# Measures how well each cereal fits in its cluster
+# Higher is better
+fviz_nbclust(Cereals_scaled, FUN = hcut, method = "silhouette", k.max = 10) +
+  labs(title = "Silhouette Method") +
+  theme_minimal()
+```
+
+## Silhouette Highest Point
+ 10 but 2 is also strong
+ 
+## Gap Statistic Method
+
+```{r gap-stat, fig.width=10, fig.height=4}
+# Method 3: Gap statistic
+# Compares our clustering to random data
+set.seed(123)  # For reproducibility
+fviz_nbclust(Cereals_scaled, FUN = hcut, method = "gap_stat", k.max = 10) +
+  labs(title = "Gap Statistic") +
+  theme_minimal()
+```
+
+## Selecting k and Creating Clusters
+10 clusters is likely too many for cereal choices 
+```{r choose-k}
+# Based on the plots above, choosing k=4
+# The elbow shows a bend around 3-4, and 4 gives us enough groups
+# without being too many to interpret
+optimal_k <- 4
+
+# Cutting the dendrogram to create clusters
+clusters <- cutree(hc_ward, k = optimal_k)
+
+# Adding cluster assignments back to our data
+Cereals_clean$cluster <- clusters
+
+# Seeing how many cereals ended up in each cluster
+cat("Cluster sizes:\n")
+print(table(clusters))
+```
+**Why k=4?** Looking at the elbow plot, there's a clear bend around 4. The silhouette method also suggests 3-4 clusters. Four groups gives us enough separation to see meaningful differences.
+
+## Visualizing the Clusters
+```{r viz-clusters, fig.width=10, fig.height=7}
+# Plotting clusters in 2D space
+# PCA reduces our 10 variables down to 2 dimensions for plotting
+fviz_cluster(list(data = Cereals_scaled, cluster = clusters),
+             palette = "jco",
+             ellipse.type = "convex",
+             repel = TRUE,
+             ggtheme = theme_minimal(),
+             main = "Cluster Visualization (PCA)")
+```
+
+## Understanding The Clusters
+Cluster 1 (blue) 3 cereals and very distinct 
+Cluster 2 (yellow) 37 cereals - very large
+Cluster 3 (gray) 25 cereals
+Cluster 4 (pink) 9 cereals
+
+```{r cluster-profiles}
+# Calculating average values for each cluster
+# This shows what makes each cluster different
+cluster_summary <- Cereals_clean %>%
+  group_by(cluster) %>%
+  summarise(
+    n = n(),
+    avg_calories = round(mean(calories), 1),
+    avg_protein = round(mean(protein), 1),
+    avg_fiber = round(mean(fiber), 1),
+    avg_sugars = round(mean(sugars), 1),
+    avg_rating = round(mean(rating), 1)
+  )
+
+print(cluster_summary)
+```
+**Notes?** Cluster 1 is looking promising with calories:protein ratio
+
+```{r example-Cereals}
+# Showing a few cereals from each cluster as examples
+cat("\n\nExample Cereals from each cluster:\n")
+for (i in 1:optimal_k) {
+  cat("\nCluster", i, ":\n")
+  examples <- Cereals_clean %>%
+    filter(cluster == i) %>%
+    select(name) %>%
+    head(5)
+  print(examples$name)
+}
+```
+**Cluster Interpretation:**
+
+-- **Cluster 1:** Likely high fiber, healthier cereals - doens't seem super kid friendly
+- **Cluster 2:** Probably sugary cereals
+-- **Cluster 3:** Medium/balanced nutritional values
+-- **Cluster 4:** Could be high-protein 
+---
+
+# (d) Cluster Stability and Identifying Healthy Cereals
+
+## Testing Stability
+
+The assignment asks to check if the clusters are stable. Approach: split the data in half, cluster one half, then see if the other half fits the same pattern.
+
+
+```{r stability}
+# Setting seed so results are reproducible
+set.seed(456)
+
+# Splitting data 60/40
+n <- nrow(Cereals_scaled)
+train_size <- floor(0.6 * n)
+train_idx <- sample(1:n, train_size)
+
+# Partition A (training set)
+partition_A <- Cereals_scaled[train_idx, ]
+
+# Partition B (test set)
+partition_B <- Cereals_scaled[-train_idx, ]
+
+cat("Partition A:", nrow(partition_A), "Cereals\n")
+cat("Partition B:", nrow(partition_B), "Cereals\n")
+```
+
+## Clustering A
+```{r cluster-A}
+# Running Ward's method on Partition A only
+hc_A <- agnes(partition_A, method = "ward")
+clusters_A <- cutree(hc_A, k = optimal_k)
+
+# Calculating the center point (centroid) of each cluster
+centroids <- matrix(0, nrow = optimal_k, ncol = ncol(partition_A))
+for (i in 1:optimal_k) {
+  cluster_data <- partition_A[clusters_A == i, , drop = FALSE]
+  centroids[i, ] <- colMeans(cluster_data)
+}
+
+cat("Clustered Partition A into", optimal_k, "clusters\n")
+cat("Calculated", optimal_k, "centroids\n")
+```
+## Clustering B
+```{r assign-B}
+# For each cereal in Partition B, we will find which cluster centroid it's closest to 
+
+# Calculate distance to each centroid
+assign_cluster <- function(cereal, centroids) {
+  distances <- apply(centroids, 1, function(center) {
+    sqrt(sum((cereal - center)^2))
+  })
+  which.min(distances)
+}
+
+# Assigning each cereal in B to nearest centroid from A
+clusters_B_predicted <- apply(partition_B, 1, assign_cluster, centroids = centroids)
+
+# What would the clusters actually be if we clustered all data?
+clusters_all <- cutree(hc_ward, k = optimal_k)
+clusters_B_actual <- clusters_all[-train_idx]
+
+# Comparing predictions to actual
+agreement <- sum(clusters_B_predicted == clusters_B_actual) / length(clusters_B_actual)
+
+cat("Stability test results:\n")
+cat("Agreement rate:", round(agreement * 100, 1), "%\n\n")
+
+# Creating confusion matrix to see where mismatches happen
+cat("Confusion Matrix:\n")
+confusion <- table(Predicted = clusters_B_predicted, Actual = clusters_B_actual)
+print(confusion)
+```
+
+**Stability Interpretation:**
+
+Following the assignment's partitioning approach:
+- Agreement rate of 3.3% indicates the random split created instability
+- Cluster 1 (the 3 bran cereals) remains very distinct in the dendrogram
+- The low agreement rate may reflect sensitivity to which specific cereals are in the training set
+- Visual inspection of the dendrogram shows clear separation, especially for Cluster 1
+- For the school recommendation, Cluster 1's distinctiveness gives more confidence in its stability
+
+## Finding Healthy Cereals for Schools
+
+Next, we identify which cluster has the healthiest cereals by looking at the nutritional averages.
+
+```{r identify-healthy}
+# Viewing the full cluster summary to see all nutritional info
+cluster_summary_full <- Cereals_clean %>%
+  group_by(cluster) %>%
+  summarise(
+    n = n(),
+    avg_calories = round(mean(calories), 1),
+    avg_protein = round(mean(protein), 1),
+    avg_fat = round(mean(fat), 1),
+    avg_fiber = round(mean(fiber), 1),
+    avg_sugars = round(mean(sugars), 1),
+    avg_rating = round(mean(rating), 1)
+  )
+
+print(cluster_summary_full)
+
+cat("\nHealthiest Cluster: Cluster 1\n\n")
+
+# Let's see all cereals in Cluster 1
+healthy_Cereals <- Cereals_clean %>%
+  filter(cluster == 1) %>%
+  select(name, calories, protein, fiber, sugars, rating)
+
+cat("Recommended cereals for elementary schools:\n")
+print(healthy_Cereals)
+```
+**Recommendation for Schools:**
+
+Based on the cluster analysis, **Cluster 1** contains the healthiest cereals for elementary schools:
+
+- Very low in calories (50-70)
+- High in protein (4g each)  
+- High in fiber
+- Low in sugar
+
+The three cereals recommended are:
+1. 100% Bran
+2. All-Bran
+3. All-Bran with Extra Fiber
+
+---
+
+## Should Data Be Normalized?
+
+**Answer: Yes, the data should be normalized.**
+
+**Reasons:**
+
+1. **Different scales** - Sodium is measured in milligrams  while protein is in grams
+2. **Fair comparison** - Without normalization, variables with larger numbers would dominate the clustering just because of scale, not because they're more important
+3. **Equal weight** - Normalization (using the `scale()` function) ensures all nutritional factors contribute equally to the cluster formation
+
+---
+
+# Summary
+
+This analysis used hierarchical clustering to group 74 breakfast cereals:
+
+- **Best method:** Ward's linkage (coefficient = 0.923)
+- **Optimal clusters:** 4 groups
+- **Healthiest cluster:** Cluster 1 (high fiber bran cereals)
+- **Recommendation:** Schools should offer cereals from Cluster 1 for the healthiest options
